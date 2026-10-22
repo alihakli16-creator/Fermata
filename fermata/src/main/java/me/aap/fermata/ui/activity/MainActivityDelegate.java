@@ -333,11 +333,36 @@ public class MainActivityDelegate extends ActivityDelegate
 		return completed(false);
 	}
 
+	private boolean autoPlayRunning;
+
+	// Retries are needed because right after the car starts the USB drive may not be mounted yet,
+	// or the audio focus may still be held by another app. Gives up after about a minute.
 	private void autoPlayLast() {
 		if (!getPrefs().getBooleanPref(MainActivityPrefs.AUTOPLAY_LAST_ON_START)) return;
-		getLib().getLastPlayedItem().main().onSuccess(i -> {
-			if (i != null) getMediaServiceBinder().playItem(i, getLib().getLastPlayedPosition(i));
-		});
+		if (autoPlayRunning) return;
+		autoPlayRunning = true;
+		autoPlayAttempt(0);
+	}
+
+	private void autoPlayAttempt(int attempt) {
+		new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+			try {
+				FermataServiceUiBinder b = getMediaServiceBinder();
+
+				if ((b == null) || b.isPlaying() || (attempt >= 12)) {
+					autoPlayRunning = false;
+					return;
+				}
+
+				getLib().getLastPlayedItem().main().onSuccess(i -> {
+					if (i != null) b.playItem(i, getLib().getLastPlayedPosition(i));
+				});
+				autoPlayAttempt(attempt + 1);
+			} catch (Exception ex) {
+				autoPlayRunning = false;
+				Log.e(ex, "Autoplay failed");
+			}
+		}, (attempt == 0) ? 1500 : 5000);
 	}
 
 	private void defaultIntent() {
