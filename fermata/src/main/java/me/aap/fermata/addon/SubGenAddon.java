@@ -70,6 +70,9 @@ public class SubGenAddon implements FermataAddon {
 
 	public void contributeSettings(Context ctx, PreferenceStore ps, PreferenceSet set,
 																 ChangeableCondition visibility, boolean isGlobalSettings) {
+		// No subtitle generator module in this build (e.g. the car build): nothing to configure
+		if ((getClass() == SubGenAddon.class) && !isImplAvailable()) return;
+
 		var mps = isGlobalSettings ?
 				MainActivityDelegate.get(ctx).getMediaServiceBinder().getLib().getPrefs() : ps;
 
@@ -209,6 +212,17 @@ public class SubGenAddon implements FermataAddon {
 	protected List<Pair<String, String>> getSupportedLanguages() {
 		return Collections.singletonList(
 				new Pair<>("auto", FermataApplication.get().getString(R.string.auto)));
+	}
+
+	/**
+	 * Returns true if the selected subtitle generator implementation (e.g. whisper) is part of this build.
+	 */
+	public static boolean isImplAvailable() {
+		var impl = FermataApplication.get().getPreferenceStore().getStringPref(IMPL);
+		for (AddonInfo ai : me.aap.fermata.BuildConfig.ADDONS) {
+			if (ai.moduleName.equals(impl) || ai.className.equals(impl)) return true;
+		}
+		return false;
 	}
 
 	private AddonInfo getImplInfo() {

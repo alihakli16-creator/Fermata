@@ -273,7 +273,7 @@ public class SettingsFragment extends MainActivityFragment
 	public static void addAutoSubPrefs(Context ctx, PreferenceSet set, PreferenceStore ps,
 																		 ChangeableCondition cond, boolean isGlobalSettings) {
 		var subGen = FermataApplication.get().getAddonManager().getAddon(SubGenAddon.class);
-		if (subGen == null) return;
+		if ((subGen == null) || !SubGenAddon.isImplAvailable()) return;
 
 		var subGenSet = set.subSet(o -> {
 			o.title = R.string.subtitles_auto;
@@ -775,11 +775,15 @@ public class SettingsFragment extends MainActivityFragment
 
 	private void addAddons(PreferenceSet set) {
 		AddonManager amgr = FermataApplication.get().getAddonManager();
-		PreferenceSet sub = set.subSet(o -> o.title = R.string.addons);
+		PreferenceSet sub = null;
 		PreferenceStore store = FermataApplication.get().getPreferenceStore();
 
 		for (AddonInfo addon : BuildConfig.ADDONS) {
 			if (!addon.hasSettings) continue;
+			if (SubGenAddon.class.getName().equals(addon.className) && !SubGenAddon.isImplAvailable()) {
+				continue;
+			}
+			if (sub == null) sub = set.subSet(o -> o.title = R.string.addons);
 			AddonPrefsBuilder b = new AddonPrefsBuilder(amgr, addon, store);
 			PreferenceSet sub1 = sub.subSet(b);
 			sub1.configure(b::configure);
