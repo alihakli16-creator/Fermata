@@ -1,0 +1,78 @@
+name: Build Car APK
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Fermata (standalone) APKs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Read versions from version catalog
+        run: |
+          ver_file=gradle/libs.versions.toml
+          version() { grep -Po "(?<=$1).+" $ver_file |  sed -e 's/[= "]//g'; }
+          echo "APP_VERSION=$(version appVersionName)-car-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "ANDROID_NDK_VERSION=$(version ndkVersion)" >> $GITHUB_ENV
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - name: Cache Android NDK
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/android/sdk/ndk/${{ env.ANDROID_NDK_VERSION }}
+          key: ${{ runner.os }}-android-ndk-${{ env.ANDROID_NDK_VERSION }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build APKs
+        env:
+          NO_GS: true
+          CAR_BUILD: true
+        run: |
+          out=fermata/build/outputs/apk_from_bundle/mobileRelease
+          mkdir -p dist/arm64 dist/arm
+          ./gradlew fermata:packageMobileReleaseUniversalApk -PABI=arm64-v8a -PAPP_NAME="BYD Video" --build-cache
+          mv $out/*.apk dist/arm64/
+          ./gradlew fermata:packageMobileReleaseUniversalApk -PABI=armeabi-v7a -PAPP_NAME="BYD Video" --build-cache
+          mv $out/*.apk dist/arm/
+
+      - name: Upload arm64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: fermata-car-${{ env.APP_VERSION }}-arm64
+          path: dist/arm64/*.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload arm APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: fermata-car-${{ env.APP_VERSION }}-arm
+          path: dist/arm/*.apk
+          retention-days: 30
+          if-no-files-found: error
