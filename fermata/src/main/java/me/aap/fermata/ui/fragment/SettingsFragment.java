@@ -665,6 +665,12 @@ public class SettingsFragment extends MainActivityFragment
 			o.pref = MainActivityPrefs.AUTOSTART;
 			o.title = R.string.autostart_on_boot;
 		});
+		sub1.addBooleanPref(o -> {
+			o.store = a.getPrefs();
+			o.pref = MainActivityPrefs.AUTOPLAY_LAST_ON_START;
+			o.title = R.string.autoplay_last_on_start;
+			o.subtitle = R.string.autoplay_last_on_start_sub;
+		});
 
 		return new PreferenceViewAdapter(set) {
 			@Override
