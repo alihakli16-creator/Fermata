@@ -660,6 +660,12 @@ public class SettingsFragment extends MainActivityFragment
 			}
 		}
 
+		sub1.addBooleanPref(o -> {
+			o.store = a.getPrefs();
+			o.pref = MainActivityPrefs.AUTOSTART;
+			o.title = R.string.autostart_on_boot;
+		});
+
 		return new PreferenceViewAdapter(set) {
 			@Override
 			public void setPreferenceSet(PreferenceSet set) {

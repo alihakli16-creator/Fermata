@@ -32,6 +32,8 @@ project(':utils').projectDir = file('depends/utils')
 file('modules').eachDir {
     def name = ':' + it.name
     if ((':gdrive' == name) && !gradle.ext.enableGoogleServices) return
+    // Car build: skip modules that have no code in the main source set (e.g. 'poi' is Android Auto only)
+    if (System.getenv('CAR_BUILD') != null && !file("${it}/src/main/java").isDirectory()) return
     gradle.ext.modules.add(name)
     include name
     project(name).projectDir = it

@@ -152,6 +152,7 @@ public class MainActivityDelegate extends ActivityDelegate
 		implements MediaSessionCallbackAssistant, PreferenceStore.Listener {
 	public static final String INTENT_ACTION_OPEN = "open";
 	public static final String INTENT_ACTION_PLAY = "play";
+	public static final String INTENT_ACTION_AUTOSTART = "me.aap.fermata.action.AUTOSTART";
 	public static final String INTENT_ACTION_UPDATE = "update";
 	public static final String INTENT_ACTION_FINISH = "finish";
 	private static final String INTENT_SCHEME = "fermata";
@@ -288,6 +289,11 @@ public class MainActivityDelegate extends ActivityDelegate
 			return completed(true);
 		}
 
+		if (INTENT_ACTION_AUTOSTART.equals(intent.getAction())) {
+			autoPlayLast();
+			return completed(false); // the default intent shows the player UI
+		}
+
 		for (FermataAddon a : AddonManager.get().getAddons()) {
 			if (a.handleIntent(this, intent)) return completed(true);
 		}
@@ -325,6 +331,12 @@ public class MainActivityDelegate extends ActivityDelegate
 		}
 
 		return completed(false);
+	}
+
+	private void autoPlayLast() {
+		getLib().getLastPlayedItem().main().onSuccess(i -> {
+			if (i != null) getMediaServiceBinder().playItem(i, getLib().getLastPlayedPosition(i));
+		});
 	}
 
 	private void defaultIntent() {
