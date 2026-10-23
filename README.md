@@ -6,25 +6,25 @@ Bu proje, **Fermata Auto** açık kaynak medya oynatıcısının araç multimedy
 
 ## 🚗 Eklenen Özel Araç Özellikleri
 
-1. **USB ve MicroSD Kartı Aynı Anda Kullanma & Otomatik Başlatma:**
+1. **Ayarlanabilir Açılış Gecikmesi (0 - 150 Saniye):**
+   * Araç ilk çalıştığında (boot / quickboot) multimedya ünitesinin sistem servislerini (BYD DiLink başlatıcı, klima, ses sunucusu vb.) tam olarak başlatıp stabilize olabilmesi için Ayarlar menüsüne 0 ile 150 saniye arasında ayarlanabilen bir gecikme kaydırıcısı eklendi.
+   * İlk boot esnasında takılı olan USB/MicroSD kart bu bekleme süresini ezmez; sistem tamamen oturduktan sonra video pürüzsüz şekilde başlar. (Önerilen süre: 20-40 sn, varsayılan: 30 sn).
+
+2. **USB ve MicroSD Kartı Aynı Anda Kullanma & Otomatik Başlatma:**
    * Hem USB bellek hem de araçtaki MicroSD kart aynı anda kullanılabilir.
    * Fermata içindeki **Klasörler (Folders)** sekmesinden hem MicroSD kartın hem de USB belleğin dizinleri kütüphaneye eklenebilir; tüm video ve müzikler tek bir yerde listelenir.
    * En son hangi ortamdaki (USB veya MicroSD) videoyu/müziği oynattıysanız, sistem açılışında (`ACTION_MEDIA_MOUNTED`) o cihazın bağlanmasıyla birlikte otomatik başlatma devreye girer.
    * USB veya MicroSD kart araç çalışırken çıkarılırsa (`ACTION_MEDIA_UNMOUNTED` / `ACTION_MEDIA_EJECT`) oynatıcı hata vermeden temiz bir şekilde kendini duraklatır.
 
-2. **Hatırlanan İçeriği Baştan Başlatma ve Donma Koruması (Anti-Stutter):**
+3. **Hatırlanan İçeriği Baştan Başlatma ve Donma Koruması (Anti-Stutter):**
    * Araç ilk açıldığında videonun ortasındaki bir saniyeye seek (atlama) yaparken araç donanım dekoderinin yaşadığı 3-5 saniyelik takılma ve donmalar tamamen engellendi.
    * Uygulama en son hangi videoda/mp3'te kaldığınızı hatırlar ancak oynatmaya doğrudan **00:00** başından başlar.
    * Parça ve video geçişlerinde tertemiz başlar.
 
-3. **Akıllı Ses Kısma (Audio Ducking):**
+4. **Akıllı Ses Kısma (Audio Ducking):**
    * Geri vitese takıldığında (360° park kamerası ve park sensörleri açıldığında) veya navigasyon (Yandex, Google Haritalar) sesli yönlendirme yaptığında video duraklatılmaz; medya sesi otomatik olarak %25 seviyesine kısılır.
    * Manevra bittiğinde (vites tekrar D/P konumuna alındığında) veya navigasyon anonsu bittiğinde ses anında eski seviyesine döner.
    * Telefon görüşmelerinde ise mikrofona ses gitmemesi için video duraklatılır ve çağrı bitince kaldığı saniyeden devam eder.
-
-4. **USB / MicroSD Bağlantı Olayı ile Sıfır Gecikmeli Başlatma (`ACTION_MEDIA_MOUNTED`):**
-   * Depolama birimi sisteme bağlandığı milisaniyede algılanır ve video anında başlatılır.
-   * 40 saniyelik sabit bekleme süresi sadece yedek olarak tutulur; ortam hazır olur olmaz bekleme iptal edilir.
 
 5. **Kontak / Ekran Kapanınca Otomatik Duraklatma (ACC OFF):**
    * Araç stop edildiğinde, şarj kesildiğinde veya ekran karardığında son saniye hafızaya alınarak oynatıcı duraklatılır (akü tüketimi sıfıra iner).
@@ -45,7 +45,7 @@ Bu paketteki GitHub Actions iş akışı (`.github/workflows/build-car-apk.yml`)
 İndirdiğiniz bu zip dosyasının içindeki tüm dosya ve klasörleri (`.github`, `fermata`, `settings.gradle` vb.) GitHub'daki Fermata reponuzun ana dizinine açın ve GitHub'a pushlayın:
 ```bash
 git add .
-git commit -m "feat: car edition with usb + microsd dual storage and audio ducking"
+git commit -m "feat: car edition with configurable boot delay and audio ducking"
 git push origin master
 ```
 

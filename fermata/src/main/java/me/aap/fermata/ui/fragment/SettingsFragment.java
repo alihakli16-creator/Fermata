@@ -665,6 +665,16 @@ public class SettingsFragment extends MainActivityFragment
 			o.pref = MainActivityPrefs.AUTOSTART;
 			o.title = R.string.autostart_on_boot;
 		});
+		sub1.addIntPref(o -> {
+			o.store = a.getPrefs();
+			o.pref = MainActivityPrefs.AUTOSTART_DELAY;
+			o.title = R.string.autostart_delay;
+			o.subtitle = R.string.autostart_delay_sub;
+			o.seekMin = 0;
+			o.seekMax = 150;
+			o.seekScale = 5;
+			o.visibility = PrefCondition.create(a.getPrefs(), MainActivityPrefs.AUTOSTART);
+		});
 		sub1.addBooleanPref(o -> {
 			o.store = a.getPrefs();
 			o.pref = MainActivityPrefs.AUTOPLAY_LAST_ON_START;

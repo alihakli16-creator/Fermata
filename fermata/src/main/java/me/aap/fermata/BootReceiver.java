@@ -15,12 +15,12 @@ import me.aap.utils.log.Log;
 
 /**
  * Starts Fermata and resumes the last played video after the device boots.
- * Listens for system boot, quickboot power on, and immediate USB and MicroSD media mount.
- * When a USB drive or MicroSD card mounts, the fallback delay is cancelled and Fermata launches immediately.
+ * Supports configurable launch delay (0 to 150 seconds) so the vehicle's Android system
+ * and media mount can stabilize before launching the player.
  */
 public class BootReceiver extends BroadcastReceiver {
 	private static final String ACTION_LAUNCH = "me.aap.fermata.action.AUTOSTART_LAUNCH";
-	private static final long LAUNCH_DELAY = 40000; // milliseconds fallback delay after boot
+	private static final long DEFAULT_DELAY_MS = 30000; // default 30 seconds
 
 	@Override
 	public void onReceive(Context ctx, Intent intent) {
@@ -33,10 +33,14 @@ public class BootReceiver extends BroadcastReceiver {
 				|| "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
 			if (isEnabled()) scheduleLaunch(ctx);
 		} else if (Intent.ACTION_MEDIA_MOUNTED.equals(action)) {
-			// USB drive or MicroSD card is mounted - launch immediately without waiting 40 seconds
+			// External storage (USB / MicroSD) mounted.
+			// Only trigger immediate launch if the system was already booted long ago.
+			// During the initial boot delay window, do not bypass the user-configured delay!
 			if (isEnabled()) {
-				cancelScheduledLaunch(ctx);
-				launch(ctx);
+				long delay = getLaunchDelay();
+				if (SystemClock.elapsedRealtime() > (delay + 10000L)) {
+					launch(ctx);
+				}
 			}
 		} else if (ACTION_LAUNCH.equals(action)) {
 			if (isEnabled()) launch(ctx);
@@ -52,6 +56,16 @@ public class BootReceiver extends BroadcastReceiver {
 		}
 	}
 
+	private static long getLaunchDelay() {
+		try {
+			int sec = MainActivityPrefs.get().getIntPref(MainActivityPrefs.AUTOSTART_DELAY);
+			return Math.max(0, sec) * 1000L;
+		} catch (Exception ex) {
+			Log.e(ex, "Failed to read the autostart delay preference");
+			return DEFAULT_DELAY_MS;
+		}
+	}
+
 	private static void launch(Context ctx) {
 		try {
 			Intent i = new Intent(ctx, MainActivity.class);
@@ -63,24 +77,12 @@ public class BootReceiver extends BroadcastReceiver {
 		}
 	}
 
-	private static void cancelScheduledLaunch(Context ctx) {
-		try {
-			AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
-			if (am == null) return;
-			Intent i = new Intent(ctx, BootReceiver.class);
-			i.setAction(ACTION_LAUNCH);
-			PendingIntent pi = PendingIntent.getBroadcast(ctx, 1000, i,
-					PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_NO_CREATE);
-			if (pi != null) {
-				am.cancel(pi);
-				pi.cancel();
-			}
-		} catch (Exception ex) {
-			Log.e(ex, "Failed to cancel scheduled launch");
-		}
-	}
-
 	private static void scheduleLaunch(Context ctx) {
+		long delay = getLaunchDelay();
+		if (delay <= 0) {
+			launch(ctx);
+			return;
+		}
 		try {
 			AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
 			if (am == null) return;
@@ -89,7 +91,7 @@ public class BootReceiver extends BroadcastReceiver {
 			PendingIntent pi = PendingIntent.getBroadcast(ctx, 1000, i,
 					PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 			am.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-					SystemClock.elapsedRealtime() + LAUNCH_DELAY, pi);
+					SystemClock.elapsedRealtime() + delay, pi);
 		} catch (Exception ex) {
 			Log.e(ex, "Failed to schedule the autostart launch");
 			launch(ctx); // better to start right away than not at all
