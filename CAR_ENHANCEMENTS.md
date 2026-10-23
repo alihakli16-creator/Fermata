@@ -1,41 +1,49 @@
-# Fermata Auto - Araç İçi Entegrasyon İyileştirmeleri (v7.3)
+# Fermata Auto - Araç İçi Entegrasyon İyileştirmeleri (v7)
 
-Bu paket, Fermata Auto uygulamasının araç içi multimedya (özellikle **BYD Seal U DM-i** DiLink ve Android Automotive/head unit) sistemlerinde fabrika çıkışı bir medya oynatıcı gibi çalışması için geliştirilen yeni özellikleri içerir.
-
----
+Bu paket, Fermata Auto uygulamasının araç içi multimedya (BYD DiLink ve Android Automotive/head unit) sistemlerinde fabrika çıkışı bir medya oynatıcı gibi çalışması için geliştirilen yeni özellikleri içerir.
 
 ## Eklenen Özellikler
 
-### 1. Hem USB Hem MicroSD Kart Eşzamanlı Kullanım ve Otomatik Başlatma
-* **Nasıl Çalışır:** Fermata Auto dosya kütüphanesine hem USB belleğin (`/storage/XXXX-XXXX` vb.) hem de MicroSD kartın (`/storage/sdcard1` vb.) klasörleri eklenebilir. Android çekirdeği hem USB hem MicroSD mount işlemlerinde `Intent.ACTION_MEDIA_MOUNTED` sinyali fırlatır.
-* **Sonuç:** Hangi ortamdan video/müzik dinliyorsanız sistem o ortamı tanır ve başlatır. Ayrıca ortam araç çalışırken çıkarılırsa (`ACTION_MEDIA_UNMOUNTED` / `ACTION_MEDIA_EJECT`) oynatıcı çökmeden kendini duraklatır.
+### 1. Araç Uyku ve Uyanma Desteği (ACC ON / Standby Resume)
 
-### 2. Hatırlanan İçeriği Baştan Başlatma ve Donma Koruması (Anti-Stutter & Clean Start)
-* **Nasıl Çalışır:** Araç açıldığında videonun ortasındaki bir saniyeye seek yaparken USB/MicroSD okuma gecikmesi ve dekoderin ana kare (I-frame) araması nedeniyle oluşan 3-5 saniyelik görüntü donması engellendi. Uygulama en son hangi videoda/şarkıda kaldığını hatırlar, ancak oynatmaya doğrudan **00:00** başından başlar.
-* **Sonuç:** Takılma ve gecikme olmadan anında ve pürüzsüz başlangıç.
+* **Nasıl Çalışır:** Araçlar çoğu zaman tamamen kapanmaz, akü tasarrufu için derin uykuya (standby/suspend) geçer. Sistem ekranın uyanmasını (`ACTION_SCREEN_ON`) ve güç beslemesini (`ACTION_POWER_CONNECTED`) dinler.
 
-### 3. Akıllı Ses Kısma ve Geri Vites Yönetimi (Audio Ducking)
-* **Nasıl Çalışır:** `AudioManager.OnAudioFocusChangeListener` entegrasyonuyla geçici ses kesintileri (`AUDIOFOCUS_LOSS_TRANSIENT` ve `AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK`) dinlenir.
-* **Sonuç:** 
-  * Geri vitese takıldığında (360° park kamerası ve sensörler açıldığında) video duraklatılmaz, ses seviyesi otomatik olarak %25'e kısılır (audio ducking). Manevra bitip D/P konumuna geçince ses anında eski seviyesine döner.
-  * Navigasyon (Yandex/Google Haritalar) sesli yönlendirme yaptığında aynı şekilde ses kısılır, anons bittiğinde hemen geri yükselir.
-  * Telefon görüşmelerinde ise mikrofona müzik sesi gitmemesi için video duraklatılır ve görüşme sonlandığında kaldığı saniyeden devam eder.
+* **Sonuç:** Araca binip kontağı açtığınızda uygulama kendiliğinden kaldığı yerden çalmaya devam eder.
 
-### 4. Araç Uyku ve Uyanma Desteği (ACC ON / Standby Resume)
-* **Nasıl Çalışır:** Ekranın uyanmasını (`ACTION_SCREEN_ON`) ve güç beslemesini (`ACTION_POWER_CONNECTED`) dinler.
-* **Sonuç:** Araca binip kontağı açtığınızda uygulama kendiliğinden en son videoyu baştan tertemiz başlatır.
+### 2. USB Bağlantı Olayı ile Sıfır Gecikmeli Başlatma (`ACTION_MEDIA_MOUNTED`)
 
-### 5. Kontak/Ekran Kapanınca Otomatik Duraklatma (ACC OFF)
+* **Nasıl Çalışır:** Önceki sürümdeki sabit 40 saniyelik gecikme yerine doğrudan Android'in `ACTION_MEDIA_MOUNTED` yayını yakalanır.
+
+* **Sonuç:** USB bellek sisteme bağlandığı milisaniyede 40 saniyelik sayaç iptal edilir ve video anında başlatılır. USB takılı değilse veya sinyal gecikirse 40 saniyelik yedek alarm güvenli bir şekilde devreye girer.
+
+### 3. Kontak/Ekran Kapanınca Otomatik Duraklatma (ACC OFF)
+
 * **Nasıl Çalışır:** Araç stop ettiğinde, şarj kesildiğinde (`ACTION_POWER_DISCONNECTED`) veya ekran karardığında (`ACTION_SCREEN_OFF`) anlık pozisyon hafızaya alınır ve oynatıcı duraklatılır.
-* **Sonuç:** Araç kilitliyken arka planda video oynamaya devam etmez, akü tükenmez.
 
----
+* **Sonuç:** Araç kilitliyken arka planda video oynamaya devam etmez, akü tükenmez ve içerik kaçırılmaz.
+
+### 4. Akıllı Ses Odağı ve Geri Vites Yönetimi (Audio Focus)
+
+* **Nasıl Çalışır:** `AudioManager.OnAudioFocusChangeListener` entegrasyonuyla geçici ses kesintileri (`AUDIOFOCUS_LOSS_TRANSIENT` ve `AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK`) dinlenir.
+
+* **Sonuç:**
+
+  * Geri vitese takıldığında (360° park kamerası ve sensörler açıldığında) video otomatik olarak duraklatılır.
+
+  * Park işlemi bitip araç tekrar D veya P konumuna alındığında video kaldığı saniyeden otomatik devam eder.
+
+  * Navigasyon (Yandex/Google Haritalar) sesli yönlendirme yaptığında veya telefon çağrısı geldiğinde aynı akıllı duraklatma ve geri sürdürme mekanizması çalışır.
 
 ## Değiştirilen Dosyalar
 
-1. `fermata/src/main/AndroidManifest.xml`: `MANAGE_EXTERNAL_STORAGE` ve `WRITE_EXTERNAL_STORAGE` izinleri, `BootReceiver` için `ACTION_MEDIA_MOUNTED` ve `ACTION_MEDIA_UNMOUNTED` intent-filter'ları eklendi.
-2. `fermata/src/main/java/me/aap/fermata/BootReceiver.java`: USB ve MicroSD mount tespiti ve zamanlayıcı iptal mantığı eklendi.
-3. `fermata/src/main/java/me/aap/fermata/ui/activity/MainActivityPrefs.java`: `AUTOPLAY_FROM_BEGINNING`, `AUTO_PAUSE_ON_ACC_OFF`, `AUTORESUME_ON_ACC_ON` ve `CAR_AUDIO_FOCUS_MANAGE` ayar anahtarları eklendi.
-4. `fermata/src/main/java/me/aap/fermata/ui/activity/MainActivityDelegate.java`: 00:00 başlangıç konumu mantığı, USB/MicroSD çıkarılma duraklatması, araç durum dinleyicisi (`carStateReceiver`) ve akıllı ses kısma yöneticisi (`carAudioFocusListener`) entegre edildi.
+1. `fermata/src/main/AndroidManifest.xml`: `BootReceiver` için `ACTION_MEDIA_MOUNTED` intent-filter ve veri şeması eklendi.
+
+2. `fermata/src/main/java/me/aap/fermata/BootReceiver.java`: USB mount tespiti ve zamanlayıcı iptal mantığı eklendi.
+
+3. `fermata/src/main/java/me/aap/fermata/ui/activity/MainActivityPrefs.java`: Yeni araç içi ayar anahtarları (`AUTO_PAUSE_ON_ACC_OFF`, `AUTORESUME_ON_ACC_ON`, `CAR_AUDIO_FOCUS_MANAGE`) tanımlandı.
+
+4. `fermata/src/main/java/me/aap/fermata/ui/activity/MainActivityDelegate.java`: Araç durum dinleyicisi (`carStateReceiver`) ve akıllı ses odağı dinleyicisi (`carAudioFocusListener`) entegre edildi.
+
 5. `fermata/src/main/java/me/aap/fermata/ui/fragment/SettingsFragment.java`: Ayarlar arayüzüne yeni özelliklerin açma/kapatma anahtarları eklendi.
-6. `fermata/src/main/res/values/strings.xml` & `values-tr/strings.xml`: Türkçe ve İngilizce arayüz metinleri güncellendi.
+
+6. `fermata/src/main/res/values/strings.xml` & `values-tr/strings.xml`: Türkçe ve İngilizce arayüz metinleri eklendi.

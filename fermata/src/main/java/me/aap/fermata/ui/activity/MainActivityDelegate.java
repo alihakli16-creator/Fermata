@@ -398,7 +398,7 @@ public class MainActivityDelegate extends ActivityDelegate
 					if (getPrefs().getBooleanPref(MainActivityPrefs.AUTO_PAUSE_ON_ACC_OFF)) {
 						if ((b != null) && b.isPlaying()) {
 							wasPlayingBeforeAccOff = true;
-							b.onPause();
+							getMediaSessionCallback().onPause();
 							Log.d("CarState: Screen off / power disconnected, paused playback.");
 						}
 					}
@@ -411,7 +411,7 @@ public class MainActivityDelegate extends ActivityDelegate
 								autoPlayRunning = false;
 								autoPlayLast();
 							} else if ((b != null) && !b.isPlaying()) {
-								b.onPlay();
+								getMediaSessionCallback().onPlay();
 								Log.d("CarState: Screen on / power connected, resumed playback.");
 							}
 						} else if (getPrefs().getBooleanPref(MainActivityPrefs.AUTOPLAY_LAST_ON_START)) {
@@ -430,7 +430,7 @@ public class MainActivityDelegate extends ActivityDelegate
 						|| Intent.ACTION_MEDIA_EJECT.equals(action)
 						|| Intent.ACTION_MEDIA_BAD_REMOVAL.equals(action)) {
 					if ((b != null) && b.isPlaying()) {
-						b.onPause();
+						getMediaSessionCallback().onPause();
 						Log.d("CarState: Media unmounted/ejected, paused playback.");
 					}
 				}
@@ -505,7 +505,7 @@ public class MainActivityDelegate extends ActivityDelegate
 						if ((am != null) && ((am.getMode() == AudioManager.MODE_IN_CALL)
 								|| (am.getMode() == AudioManager.MODE_IN_COMMUNICATION))) {
 							pausedByTransientFocus = true;
-							b.onPause();
+							getMediaSessionCallback().onPause();
 							Log.d("CarAudioFocus: In phone call, pausing playback.");
 						} else {
 							// Reverse camera / park sensors / navigation guidance: duck volume smoothly
@@ -519,7 +519,7 @@ public class MainActivityDelegate extends ActivityDelegate
 					if (pausedByTransientFocus) {
 						pausedByTransientFocus = false;
 						if ((b != null) && !b.isPlaying()) {
-							b.onPlay();
+							getMediaSessionCallback().onPlay();
 							Log.d("CarAudioFocus: Focus gained, auto-resuming playback.");
 						}
 					}
