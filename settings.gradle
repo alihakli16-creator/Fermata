@@ -32,10 +32,8 @@ project(':utils').projectDir = file('depends/utils')
 file('modules').eachDir {
     def name = ':' + it.name
     if ((':gdrive' == name) && !gradle.ext.enableGoogleServices) return
-    // Car build (video + music only): keep just the extra playback engines and drop every other
-    // add-on (web browser, YouTube, ChatGPT, Google Cast, Google Drive, SFTP, SMB, TV, subtitles
-    // generator, translators, lyrics, POI). Add a module name to the list below to bring it back.
-    if (System.getenv('CAR_BUILD') != null && !['exoplayer', 'vlc'].contains(it.name)) return
+    // Car build: skip modules that have no code in the main source set (e.g. 'poi' is Android Auto only)
+    if (System.getenv('CAR_BUILD') != null && !file("${it}/src/main/java").isDirectory()) return
     gradle.ext.modules.add(name)
     include name
     project(name).projectDir = it

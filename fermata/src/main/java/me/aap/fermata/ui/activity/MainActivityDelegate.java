@@ -335,73 +335,16 @@ public class MainActivityDelegate extends ActivityDelegate
 
 	private boolean autoPlayRunning;
 	private int autoPlayTries;
-	private long autoPlayLastTry = -1;
-	private android.content.BroadcastReceiver autoPlayMountReceiver;
 
 	// Right after the car starts the USB drive may not be mounted yet, so the last played file
-	// cannot be found. Two things work together: a timer that keeps checking for a few minutes,
-	// and a listener that reacts as soon as the system reports a mounted drive. Once the last
-	// played item is found the player is shown and playback starts.
+	// cannot be found. Keep checking for a few minutes; once the item is found, show the player
+	// and start playing. If playback does not start (e.g. audio focus is busy), try again a few times.
 	private void autoPlayLast() {
 		if (!getPrefs().getBooleanPref(MainActivityPrefs.AUTOPLAY_LAST_ON_START)) return;
 		if (autoPlayRunning) return;
 		autoPlayRunning = true;
 		autoPlayTries = 0;
-		autoPlayLastTry = -1;
-		registerAutoPlayMountReceiver();
 		autoPlayAttempt(0);
-	}
-
-	private void registerAutoPlayMountReceiver() {
-		try {
-			var filter = new android.content.IntentFilter(Intent.ACTION_MEDIA_MOUNTED);
-			filter.addDataScheme("file");
-			autoPlayMountReceiver = new android.content.BroadcastReceiver() {
-				@Override
-				public void onReceive(android.content.Context ctx, Intent intent) {
-					// Give the system a moment to finish mounting, then try right away
-					new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-						if (autoPlayRunning) autoPlayTry();
-					}, 3000);
-				}
-			};
-			androidx.core.content.ContextCompat.registerReceiver(getContext(), autoPlayMountReceiver,
-					filter, androidx.core.content.ContextCompat.RECEIVER_EXPORTED);
-		} catch (Exception ex) {
-			autoPlayMountReceiver = null;
-			Log.e(ex, "Failed to register the mount receiver");
-		}
-	}
-
-	private void autoPlayDone() {
-		autoPlayRunning = false;
-		if (autoPlayMountReceiver == null) return;
-		try {
-			getContext().unregisterReceiver(autoPlayMountReceiver);
-		} catch (Exception ignored) {
-		}
-		autoPlayMountReceiver = null;
-	}
-
-	private void autoPlayTry() {
-		try {
-			FermataServiceUiBinder b = getMediaServiceBinder();
-			if ((b == null) || b.isPlaying()) return;
-
-			// Do not restart an attempt that is still being prepared
-			long now = android.os.SystemClock.uptimeMillis();
-			if ((autoPlayLastTry >= 0) && ((now - autoPlayLastTry) < 12000)) return;
-
-			getLib().getLastPlayedItem().main().onSuccess(i -> {
-				if (i == null) return;
-				autoPlayTries++;
-				autoPlayLastTry = android.os.SystemClock.uptimeMillis();
-				goToCurrent().onCompletion((ok, err) ->
-						b.playItem(i, getLib().getLastPlayedPosition(i)));
-			});
-		} catch (Exception ex) {
-			Log.e(ex, "Autoplay failed");
-		}
 	}
 
 	private void autoPlayAttempt(int attempt) {
@@ -409,21 +352,57 @@ public class MainActivityDelegate extends ActivityDelegate
 			try {
 				FermataServiceUiBinder b = getMediaServiceBinder();
 
-				if ((b == null) || b.isPlaying() || (attempt >= 60) || (autoPlayTries >= 12)) {
-					autoPlayDone();
+				if ((b == null) || b.isPlaying() || (attempt >= 40) || (autoPlayTries >= 4)) {
+					autoPlayRunning = false;
 					return;
 				}
 
-				autoPlayTry();
+				getLib().getLastPlayedItem().main().onSuccess(i -> {
+					if (i == null) return;
+					autoPlayTries++;
+					goToCurrent().onCompletion((ok, err) ->
+							b.playItem(i, getLib().getLastPlayedPosition(i)));
+				});
 				autoPlayAttempt(attempt + 1);
 			} catch (Exception ex) {
-				autoPlayDone();
+				autoPlayRunning = false;
 				Log.e(ex, "Autoplay failed");
 			}
 		}, (attempt == 0) ? 1500 : 5000);
 	}
 
+	// Starting the app from the background needs the "Display over other apps" permission.
+	// Ask for it once, so the user does not have to find it in the system settings.
+	private void askOverlayPermission() {
+		try {
+			var ctx = getContext();
+			if (android.provider.Settings.canDrawOverlays(ctx)) return;
+			var sp = ctx.getSharedPreferences("autostart", android.content.Context.MODE_PRIVATE);
+			if (sp.getBoolean("overlay_asked", false)) return;
+			sp.edit().putBoolean("overlay_asked", true).apply();
+
+			new android.app.AlertDialog.Builder(ctx)
+					.setTitle("Otomatik başlatma izni")
+					.setMessage("Araç açılınca uygulamanın kendiliğinden başlayabilmesi için "
+							+ "\"Diğer uygulamaların üzerinde göster\" iznini açmanız gerekiyor.")
+					.setPositiveButton("İzin ver", (d, w) -> {
+						try {
+							ctx.startActivity(new Intent(
+									android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+									android.net.Uri.parse("package:" + ctx.getPackageName())));
+						} catch (Exception ex) {
+							Log.e(ex, "Failed to open the overlay permission screen");
+						}
+					})
+					.setNegativeButton("Şimdi değil", null)
+					.show();
+		} catch (Exception ex) {
+			Log.e(ex, "Failed to ask for the overlay permission");
+		}
+	}
+
 	private void defaultIntent() {
+		askOverlayPermission();
 		// A regular launcher start should resume the last item when the setting is enabled.
 		// AUTOSTART intents already invoke autoPlayLast() in handleIntent().
 		Intent launchIntent = getIntent();
