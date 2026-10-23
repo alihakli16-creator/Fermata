@@ -15,12 +15,14 @@ import me.aap.utils.log.Log;
 
 /**
  * Starts Fermata and resumes the last played video after the device boots.
- * Supports configurable launch delay (0 to 150 seconds) so the vehicle's Android system
- * and media mount can stabilize before launching the player.
+ * Supports configurable launch delay (0 to 150 seconds).
+ * Uses PendingIntent.getActivity with AlarmManager to bypass background activity
+ * start restrictions on modern Android (including Android 14 on Samsung Galaxy S24 Ultra).
  */
 public class BootReceiver extends BroadcastReceiver {
 	private static final String ACTION_LAUNCH = "me.aap.fermata.action.AUTOSTART_LAUNCH";
 	private static final long DEFAULT_DELAY_MS = 30000; // default 30 seconds
+	private static boolean launched;
 
 	@Override
 	public void onReceive(Context ctx, Intent intent) {
@@ -31,13 +33,20 @@ public class BootReceiver extends BroadcastReceiver {
 		if (Intent.ACTION_BOOT_COMPLETED.equals(action)
 				|| "android.intent.action.QUICKBOOT_POWERON".equals(action)
 				|| "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
+			launched = false;
 			if (isEnabled()) scheduleLaunch(ctx);
+		} else if (Intent.ACTION_USER_PRESENT.equals(action)) {
+			// On phones like Samsung S24 Ultra, user unlocks screen after boot.
+			if (isEnabled() && !launched) {
+				long delay = getLaunchDelay();
+				if (delay <= 0 || SystemClock.elapsedRealtime() >= delay) {
+					launch(ctx);
+				}
+			}
 		} else if (Intent.ACTION_MEDIA_MOUNTED.equals(action)) {
-			// External storage (USB / MicroSD) mounted.
-			// Only trigger immediate launch if the system was already booted long ago.
-			// During the initial boot delay window, do not bypass the user-configured delay!
 			if (isEnabled()) {
 				long delay = getLaunchDelay();
+				// If device has been running for longer than the delay, it's a live plug-in
 				if (SystemClock.elapsedRealtime() > (delay + 10000L)) {
 					launch(ctx);
 				}
@@ -67,10 +76,11 @@ public class BootReceiver extends BroadcastReceiver {
 	}
 
 	private static void launch(Context ctx) {
+		launched = true;
 		try {
 			Intent i = new Intent(ctx, MainActivity.class);
 			i.setAction(INTENT_ACTION_AUTOSTART);
-			i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 			ctx.startActivity(i);
 		} catch (Exception ex) {
 			Log.e(ex, "Failed to autostart Fermata");
@@ -79,22 +89,31 @@ public class BootReceiver extends BroadcastReceiver {
 
 	private static void scheduleLaunch(Context ctx) {
 		long delay = getLaunchDelay();
-		if (delay <= 0) {
-			launch(ctx);
-			return;
-		}
+		// On modern Android (especially Android 14 on Samsung One UI 6.1), calling startActivity
+		// synchronously inside BOOT_COMPLETED is blocked by OS background restrictions.
+		// Scheduling a PendingIntent.getActivity via AlarmManager (minimum 1.5s even for 0s delay)
+		// allows the system server to launch MainActivity cleanly.
+		long triggerDelay = Math.max(1500L, delay);
+
 		try {
 			AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
-			if (am == null) return;
-			Intent i = new Intent(ctx, BootReceiver.class);
-			i.setAction(ACTION_LAUNCH);
-			PendingIntent pi = PendingIntent.getBroadcast(ctx, 1000, i,
+			if (am == null) {
+				launch(ctx);
+				return;
+			}
+
+			// Direct Activity PendingIntent: System executes it directly, bypassing background limits
+			Intent actIntent = new Intent(ctx, MainActivity.class);
+			actIntent.setAction(INTENT_ACTION_AUTOSTART);
+			actIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+			PendingIntent pi = PendingIntent.getActivity(ctx, 1000, actIntent,
 					PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
 			am.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-					SystemClock.elapsedRealtime() + delay, pi);
+					SystemClock.elapsedRealtime() + triggerDelay, pi);
 		} catch (Exception ex) {
-			Log.e(ex, "Failed to schedule the autostart launch");
-			launch(ctx); // better to start right away than not at all
+			Log.e(ex, "Failed to schedule AlarmManager launch");
+			launch(ctx);
 		}
 	}
 }
