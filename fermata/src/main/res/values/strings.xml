@@ -392,5 +392,13 @@
     <string name="err_failed_start_service">Failed to start service: %s</string>
     <string name="autostart_on_boot">Start automatically when the car starts</string>
     <string name="autoplay_last_on_start">Automatically resume last item</string>
-    <string name="autoplay_last_on_start_sub">Resume the last video or song from its saved position when the app opens</string>
+    <string name="autoplay_last_on_start_sub">Resume the last video or song when the app opens</string>
+    <string name="autoplay_from_beginning">Start media from the beginning (00:00)</string>
+    <string name="autoplay_from_beginning_sub">Start the remembered video or song from the beginning to prevent decoder stutter</string>
+    <string name="auto_pause_on_acc_off">Pause when car stops or screen turns off</string>
+    <string name="auto_pause_on_acc_off_sub">Automatically pause playback when the car is turned off or the display turns off</string>
+    <string name="autoresume_on_acc_on">Resume when car starts or screen turns on</string>
+    <string name="autoresume_on_acc_on_sub">Automatically resume playback when the car wakes up or the display turns on</string>
+    <string name="car_audio_focus_manage">Smart audio focus (navigation &amp; reverse camera)</string>
+    <string name="car_audio_focus_manage_sub">Automatically duck volume during navigation prompts or reverse camera, then restore</string>
 </resources>

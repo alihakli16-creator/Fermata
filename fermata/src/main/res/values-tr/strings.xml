@@ -382,5 +382,13 @@
     <string name="err_no_audio_record_perm">Ses kayıt izni verilmedi</string>
     <string name="autostart_on_boot">Araç açılınca otomatik başlat</string>
     <string name="autoplay_last_on_start">Son oynatılan içeriği otomatik sürdür</string>
-    <string name="autoplay_last_on_start_sub">Uygulama açıldığında son video veya şarkıyı kayıtlı konumundan oynat</string>
+    <string name="autoplay_last_on_start_sub">Uygulama açıldığında son video veya şarkıyı otomatik oynat</string>
+    <string name="autoplay_from_beginning">İçeriği baştan (00:00) başlat</string>
+    <string name="autoplay_from_beginning_sub">Takılmaları önlemek ve temiz başlamak için hatırlanan video veya şarkıyı baştan oynatır</string>
+    <string name="auto_pause_on_acc_off">Araç stop edince veya ekran kapanınca duraklat</string>
+    <string name="auto_pause_on_acc_off_sub">Kontak kapatıldığında veya multimedya ekranı karardığında oynatmayı duraklat</string>
+    <string name="autoresume_on_acc_on">Araç açılınca veya ekran uyanınca devam ettir</string>
+    <string name="autoresume_on_acc_on_sub">Kontak açıldığında veya ekran uyandığında oynatmayı kaldığı yerden sürdür</string>
+    <string name="car_audio_focus_manage">Akıllı ses odağı (navigasyon ve geri vites)</string>
+    <string name="car_audio_focus_manage_sub">Navigasyon uyarılarında veya geri vites/park kamerasında sesi kıs, bitince eski seviyesine getir</string>
 </resources>

@@ -15,15 +15,12 @@ import me.aap.utils.log.Log;
 
 /**
  * Starts Fermata and resumes the last played video after the device boots.
- * The first launch waits about 25 seconds, so that the other apps that start with the car are up
- * first and do not take the screen or the audio from Fermata. The launch is repeated once about
- * 20 seconds later, because on some head units the system launcher comes to the front after the
- * boot broadcast and hides the app. Change the numbers below to wait longer or shorter.
+ * Listens for system boot, quickboot power on, and immediate USB and MicroSD media mount.
+ * When a USB drive or MicroSD card mounts, the fallback delay is cancelled and Fermata launches immediately.
  */
 public class BootReceiver extends BroadcastReceiver {
-	private static final String ACTION_RETRY = "me.aap.fermata.action.AUTOSTART_RETRY";
-	// Milliseconds: wait after boot before the first launch, then before the second launch
-	private static final long[] RETRY_DELAYS = {25000, 20000};
+	private static final String ACTION_LAUNCH = "me.aap.fermata.action.AUTOSTART_LAUNCH";
+	private static final long LAUNCH_DELAY = 40000; // milliseconds fallback delay after boot
 
 	@Override
 	public void onReceive(Context ctx, Intent intent) {
@@ -34,13 +31,15 @@ public class BootReceiver extends BroadcastReceiver {
 		if (Intent.ACTION_BOOT_COMPLETED.equals(action)
 				|| "android.intent.action.QUICKBOOT_POWERON".equals(action)
 				|| "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
-			if (!isEnabled()) return;
-			scheduleRetry(ctx, 0); // the first launch happens after the initial delay
-		} else if (ACTION_RETRY.equals(action)) {
-			int n = intent.getIntExtra("n", 0);
-			if (!isEnabled()) return;
-			launch(ctx);
-			scheduleRetry(ctx, n + 1);
+			if (isEnabled()) scheduleLaunch(ctx);
+		} else if (Intent.ACTION_MEDIA_MOUNTED.equals(action)) {
+			// USB drive or MicroSD card is mounted - launch immediately without waiting 40 seconds
+			if (isEnabled()) {
+				cancelScheduledLaunch(ctx);
+				launch(ctx);
+			}
+		} else if (ACTION_LAUNCH.equals(action)) {
+			if (isEnabled()) launch(ctx);
 		}
 	}
 
@@ -64,21 +63,36 @@ public class BootReceiver extends BroadcastReceiver {
 		}
 	}
 
-	private static void scheduleRetry(Context ctx, int n) {
-		if (n >= RETRY_DELAYS.length) return;
-
+	private static void cancelScheduledLaunch(Context ctx) {
 		try {
 			AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
 			if (am == null) return;
 			Intent i = new Intent(ctx, BootReceiver.class);
-			i.setAction(ACTION_RETRY);
-			i.putExtra("n", n);
-			PendingIntent pi = PendingIntent.getBroadcast(ctx, 1000 + n, i,
+			i.setAction(ACTION_LAUNCH);
+			PendingIntent pi = PendingIntent.getBroadcast(ctx, 1000, i,
+					PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_NO_CREATE);
+			if (pi != null) {
+				am.cancel(pi);
+				pi.cancel();
+			}
+		} catch (Exception ex) {
+			Log.e(ex, "Failed to cancel scheduled launch");
+		}
+	}
+
+	private static void scheduleLaunch(Context ctx) {
+		try {
+			AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+			if (am == null) return;
+			Intent i = new Intent(ctx, BootReceiver.class);
+			i.setAction(ACTION_LAUNCH);
+			PendingIntent pi = PendingIntent.getBroadcast(ctx, 1000, i,
 					PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 			am.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-					SystemClock.elapsedRealtime() + RETRY_DELAYS[n], pi);
+					SystemClock.elapsedRealtime() + LAUNCH_DELAY, pi);
 		} catch (Exception ex) {
-			Log.e(ex, "Failed to schedule an autostart retry");
+			Log.e(ex, "Failed to schedule the autostart launch");
+			launch(ctx); // better to start right away than not at all
 		}
 	}
 }

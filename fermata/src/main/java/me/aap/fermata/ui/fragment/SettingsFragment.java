@@ -671,6 +671,30 @@ public class SettingsFragment extends MainActivityFragment
 			o.title = R.string.autoplay_last_on_start;
 			o.subtitle = R.string.autoplay_last_on_start_sub;
 		});
+		sub1.addBooleanPref(o -> {
+			o.store = a.getPrefs();
+			o.pref = MainActivityPrefs.AUTOPLAY_FROM_BEGINNING;
+			o.title = R.string.autoplay_from_beginning;
+			o.subtitle = R.string.autoplay_from_beginning_sub;
+		});
+		sub1.addBooleanPref(o -> {
+			o.store = a.getPrefs();
+			o.pref = MainActivityPrefs.AUTO_PAUSE_ON_ACC_OFF;
+			o.title = R.string.auto_pause_on_acc_off;
+			o.subtitle = R.string.auto_pause_on_acc_off_sub;
+		});
+		sub1.addBooleanPref(o -> {
+			o.store = a.getPrefs();
+			o.pref = MainActivityPrefs.AUTORESUME_ON_ACC_ON;
+			o.title = R.string.autoresume_on_acc_on;
+			o.subtitle = R.string.autoresume_on_acc_on_sub;
+		});
+		sub1.addBooleanPref(o -> {
+			o.store = a.getPrefs();
+			o.pref = MainActivityPrefs.CAR_AUDIO_FOCUS_MANAGE;
+			o.title = R.string.car_audio_focus_manage;
+			o.subtitle = R.string.car_audio_focus_manage_sub;
+		});
 
 		return new PreferenceViewAdapter(set) {
 			@Override

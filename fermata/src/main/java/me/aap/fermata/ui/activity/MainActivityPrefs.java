@@ -56,6 +56,14 @@ public interface MainActivityPrefs
 	Pref<BooleanSupplier> AUTOSTART = Pref.b("AUTOSTART", true);
 	/** Automatically resume the last played media item when Fermata starts. */
 	Pref<BooleanSupplier> AUTOPLAY_LAST_ON_START = Pref.b("AUTOPLAY_LAST_ON_START", true);
+	/** Start the remembered item from the beginning (00:00) to eliminate hardware decoder seek stutter. */
+	Pref<BooleanSupplier> AUTOPLAY_FROM_BEGINNING = Pref.b("AUTOPLAY_FROM_BEGINNING", true);
+	/** Automatically pause playback when car stops, power disconnects or screen turns off. */
+	Pref<BooleanSupplier> AUTO_PAUSE_ON_ACC_OFF = Pref.b("AUTO_PAUSE_ON_ACC_OFF", true);
+	/** Automatically resume playback when car wakes up, power connects or screen turns on. */
+	Pref<BooleanSupplier> AUTORESUME_ON_ACC_ON = Pref.b("AUTORESUME_ON_ACC_ON", true);
+	/** Manage audio focus during navigation announcements and reverse camera/sensors. */
+	Pref<BooleanSupplier> CAR_AUDIO_FOCUS_MANAGE = Pref.b("CAR_AUDIO_FOCUS_MANAGE", true);
 	Pref<LongSupplier> CHECK_UPDATES_STAMP = Pref.l("CHECK_UPDATES_STAMP", 0);
 	Pref<BooleanSupplier> SYS_BARS_ON_VIDEO_TOUCH = Pref.b("SYS_BARS_ON_VIDEO_TOUCH", false);
 	Pref<BooleanSupplier> LANDSCAPE_VIDEO = Pref.b("LANDSCAPE_VIDEO", false);

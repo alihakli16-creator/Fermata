@@ -1,72 +1,62 @@
-## !!!Be aware of scam!!! The sites like https :// fermata-auto . com  are 100% scam. This app is free and opensource!
+# Fermata Auto - BYD & Araç İçi Özel Sürüm (Car Edition)
 
+Bu proje, **Fermata Auto** açık kaynak medya oynatıcısının araç multimedya sistemlerinde (özellikle **BYD Seal U DM-i**, Atto 3, Dolphin, Han, Tang ve Android tabanlı araç ünitelerinde) orijinal fabrika çıkışı bir medya oynatıcı gibi çalışması için optimize edilmiş tam paketidir.
 
-## Fermata Media Player
-[![Download the latest APK](https://img.shields.io/github/v/release/AndreyPavlenko/Fermata?label=Download%20APK&logo=github&style=for-the-badge)](https://github.com/AndreyPavlenko/Fermata/releases/latest)
+---
 
-## About
-Fermata Media Player is a free, open source audio, video and TV player with a simple and intuitive interface. It is focused on playing media files organized in folders and playlists.
+## 🚗 Eklenen Özel Araç Özellikleri
 
-Supported features:
+1. **USB ve MicroSD Kartı Aynı Anda Kullanma & Otomatik Başlatma:**
+   * Hem USB bellek hem de araçtaki MicroSD kart aynı anda kullanılabilir.
+   * Fermata içindeki **Klasörler (Folders)** sekmesinden hem MicroSD kartın hem de USB belleğin dizinleri kütüphaneye eklenebilir; tüm video ve müzikler tek bir yerde listelenir.
+   * En son hangi ortamdaki (USB veya MicroSD) videoyu/müziği oynattıysanız, sistem açılışında (`ACTION_MEDIA_MOUNTED`) o cihazın bağlanmasıyla birlikte otomatik başlatma devreye girer.
+   * USB veya MicroSD kart araç çalışırken çıkarılırsa (`ACTION_MEDIA_UNMOUNTED` / `ACTION_MEDIA_EJECT`) oynatıcı hata vermeden temiz bir şekilde kendini duraklatır.
 
-* Play media files organized in folders
-* IPTV addon with support for XMLTV EPG and Catchup
-* Remembers the last played track and position for each folder
-* Support for favorites and playlists
-* Support for CUE and M3U playlists
-* Support for bookmarks
-* Audio effects: Equalizer, Bass/Volume Boost and Virtualizer
-* Configure audio effects for individual tracks and folders
-* Configure playback speed for individual tracks and folders
-* Customizable titles and subtitles
-* Support for Android Auto
-* Support for Android TV
-* Show favorites and playlists on Android TV home screen
-* Pluggable media engines: MediaPlayer, ExoPlayer and VLC
-* Video player with support for subtitles and audio streams (VLC Engine only)
+2. **Hatırlanan İçeriği Baştan Başlatma ve Donma Koruması (Anti-Stutter):**
+   * Araç ilk açıldığında videonun ortasındaki bir saniyeye seek (atlama) yaparken araç donanım dekoderinin yaşadığı 3-5 saniyelik takılma ve donmalar tamamen engellendi.
+   * Uygulama en son hangi videoda/mp3'te kaldığınızı hatırlar ancak oynatmaya doğrudan **00:00** başından başlar.
+   * Parça ve video geçişlerinde tertemiz başlar.
 
-## Building the project
-* Download and install the latest Android SDK or Android Studio from https://developer.android.com/studio/
-* Set the environment variable ANDROID_SDK_ROOT pointing to the SDK directory
+3. **Akıllı Ses Kısma (Audio Ducking):**
+   * Geri vitese takıldığında (360° park kamerası ve park sensörleri açıldığında) veya navigasyon (Yandex, Google Haritalar) sesli yönlendirme yaptığında video duraklatılmaz; medya sesi otomatik olarak %25 seviyesine kısılır.
+   * Manevra bittiğinde (vites tekrar D/P konumuna alındığında) veya navigasyon anonsu bittiğinde ses anında eski seviyesine döner.
+   * Telefon görüşmelerinde ise mikrofona ses gitmemesi için video duraklatılır ve çağrı bitince kaldığı saniyeden devam eder.
+
+4. **USB / MicroSD Bağlantı Olayı ile Sıfır Gecikmeli Başlatma (`ACTION_MEDIA_MOUNTED`):**
+   * Depolama birimi sisteme bağlandığı milisaniyede algılanır ve video anında başlatılır.
+   * 40 saniyelik sabit bekleme süresi sadece yedek olarak tutulur; ortam hazır olur olmaz bekleme iptal edilir.
+
+5. **Kontak / Ekran Kapanınca Otomatik Duraklatma (ACC OFF):**
+   * Araç stop edildiğinde, şarj kesildiğinde veya ekran karardığında son saniye hafızaya alınarak oynatıcı duraklatılır (akü tüketimi sıfıra iner).
+
+6. **Kontak / Ekran Açılınca Devam Ettirme (ACC ON / Standby Resume):**
+   * Araç uykudan uyandığında veya ekran açıldığında, soğuk açılış (cold boot) beklenmeden video kaldığı videonun başından oynamaya devam eder.
+
+7. **Genişletilmiş Depolama İzinleri:**
+   * Android 11 ve 12 (BYD DiLink) sistemlerinde hem USB hem MicroSD karttaki tüm klasörlere tam erişim için `MANAGE_EXTERNAL_STORAGE` ve `requestLegacyExternalStorage` desteği eklendi.
+
+---
+
+## 📦 GitHub'da APK Nasıl Oluşturulur? (3 Adım)
+
+Bu paketteki GitHub Actions iş akışı (`.github/workflows/build-car-apk.yml`) sayesinde bilgisayarınızda Android Studio veya NDK kurulu olmasına gerek kalmadan bulutta doğrudan APK derleyebilirsiniz.
+
+### Adım 1: Dosyaları Repoya Aktarın
+İndirdiğiniz bu zip dosyasının içindeki tüm dosya ve klasörleri (`.github`, `fermata`, `settings.gradle` vb.) GitHub'daki Fermata reponuzun ana dizinine açın ve GitHub'a pushlayın:
 ```bash
-export ANDROID_SDK_ROOT=<path to android SDK>
+git add .
+git commit -m "feat: car edition with usb + microsd dual storage and audio ducking"
+git push origin master
 ```
 
-### Clone the repository
-```bash
-git clone --recurse-submodules https://github.com/AndreyPavlenko/Fermata.git
-cd Fermata
-```
+### Adım 2: Derlemeyi Takip Edin
+* GitHub'da reponuzun üst kısmındaki **Actions** sekmesine tıklayın.
+* **Build Car APK** iş akışının otomatik olarak başladığını göreceksiniz (ortalama 3-5 dakika sürer).
 
-### Build AAB
-```bash
-./gradlew bundleAutoRelease -PAPP_ID_SFX=.type.your.pkg.sfx.here
-find $PWD -name *.aab
-```
-
-### Build APK
-```bash
-./gradlew bundleAutoRelease -PAPP_ID_SFX=.type.your.pkg.sfx.here
-find $PWD -name *.apk
-```
-
-### Building in docker
-```bash
-docker run -ti --name Fermata andreypavlenko/fermata
-```
-Enter the requested key alias and password, when prompted.
-Build the required package using the above commands.
-To copy the built package to the host machine, open a new terminal and run:
-```bash
-docker cp Fermata:/home/mobiledevops/Fermata/fermata/build/outputs/bundle/autoRelease/ .
-```
-
-
-## Donation
-If you like the application, please consider making a donation:
-
-[PayPal](https://www.paypal.com/donate/?hosted_button_id=NP5Q3YDSCJ98N)
-
-[CloudTips](https://pay.cloudtips.ru/p/a03a73da)
-
-[Yandex Money](https://money.yandex.ru/to/410014661137336)
+### Adım 3: APK'yı İndirin
+* Derleme yeşil onay işaretiyle tamamlandığında iş akışına tıklayın.
+* Sayfanın altındaki **Artifacts** bölümünden:
+  * **fermata-car-arm64** (BYD Seal U DM-i ve modern 64-bit Android üniteleri için)
+  * **fermata-car-arm** (32-bit Android üniteleri için)
+  dosyalarından aracınıza uygun olanı indirin.
+* İndirdiğiniz zip içindeki `.apk` dosyasını bir USB belleğe atıp araç ekranından yükleyin.

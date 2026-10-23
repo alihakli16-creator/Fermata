@@ -38,7 +38,10 @@ import android.Manifest.permission;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.Context;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.media.AudioManager;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.res.ColorStateList;
@@ -245,6 +248,8 @@ public class MainActivityDelegate extends ActivityDelegate
 		b.getMediaSessionCallback().addAssistant(this, isCarActivityNotMirror() ? 0 : 1);
 		if (b.getCurrentItem() == null) b.getMediaSessionCallback().onPrepare();
 		init();
+		initCarStateReceiver();
+		initCarAudioFocus();
 
 		for (FermataAddon addon : AddonManager.get().getAddons()) {
 			if (addon instanceof FermataActivityAddon)
@@ -333,6 +338,12 @@ public class MainActivityDelegate extends ActivityDelegate
 		return completed(false);
 	}
 
+	private BroadcastReceiver carStateReceiver;
+	private boolean wasPlayingBeforeAccOff;
+	private AudioManager.OnAudioFocusChangeListener carAudioFocusListener;
+	private boolean pausedByTransientFocus;
+	private int preDuckVolume = -1;
+	private boolean isDucked;
 	private boolean autoPlayRunning;
 	private int autoPlayTries;
 
@@ -360,8 +371,9 @@ public class MainActivityDelegate extends ActivityDelegate
 				getLib().getLastPlayedItem().main().onSuccess(i -> {
 					if (i == null) return;
 					autoPlayTries++;
+					long startPos = getPrefs().getBooleanPref(MainActivityPrefs.AUTOPLAY_FROM_BEGINNING) ? 0 : getLib().getLastPlayedPosition(i);
 					goToCurrent().onCompletion((ok, err) ->
-							b.playItem(i, getLib().getLastPlayedPosition(i)));
+							b.playItem(i, startPos));
 				});
 				autoPlayAttempt(attempt + 1);
 			} catch (Exception ex) {
@@ -369,6 +381,166 @@ public class MainActivityDelegate extends ActivityDelegate
 				Log.e(ex, "Autoplay failed");
 			}
 		}, (attempt == 0) ? 1500 : 5000);
+	}
+
+	private void initCarStateReceiver() {
+		if (carStateReceiver != null) return;
+		carStateReceiver = new BroadcastReceiver() {
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				if (intent == null || intent.getAction() == null) return;
+				String action = intent.getAction();
+				FermataServiceUiBinder b = getMediaServiceBinder();
+
+				if (Intent.ACTION_SCREEN_OFF.equals(action)
+						|| Intent.ACTION_POWER_DISCONNECTED.equals(action)
+						|| Intent.ACTION_SHUTDOWN.equals(action)) {
+					if (getPrefs().getBooleanPref(MainActivityPrefs.AUTO_PAUSE_ON_ACC_OFF)) {
+						if ((b != null) && b.isPlaying()) {
+							wasPlayingBeforeAccOff = true;
+							b.onPause();
+							Log.d("CarState: Screen off / power disconnected, paused playback.");
+						}
+					}
+				} else if (Intent.ACTION_SCREEN_ON.equals(action)
+						|| Intent.ACTION_POWER_CONNECTED.equals(action)) {
+					if (getPrefs().getBooleanPref(MainActivityPrefs.AUTORESUME_ON_ACC_ON)) {
+						if (wasPlayingBeforeAccOff) {
+							wasPlayingBeforeAccOff = false;
+							if (getPrefs().getBooleanPref(MainActivityPrefs.AUTOPLAY_FROM_BEGINNING)) {
+								autoPlayRunning = false;
+								autoPlayLast();
+							} else if ((b != null) && !b.isPlaying()) {
+								b.onPlay();
+								Log.d("CarState: Screen on / power connected, resumed playback.");
+							}
+						} else if (getPrefs().getBooleanPref(MainActivityPrefs.AUTOPLAY_LAST_ON_START)) {
+							if ((b != null) && !b.isPlaying()) {
+								autoPlayLast();
+							}
+						}
+					}
+				} else if (Intent.ACTION_MEDIA_MOUNTED.equals(action)) {
+					if (getPrefs().getBooleanPref(MainActivityPrefs.AUTOPLAY_LAST_ON_START)) {
+						Log.d("CarState: Storage media mounted (USB/MicroSD), starting playback.");
+						autoPlayRunning = false;
+						autoPlayLast();
+					}
+				} else if (Intent.ACTION_MEDIA_UNMOUNTED.equals(action)
+						|| Intent.ACTION_MEDIA_EJECT.equals(action)
+						|| Intent.ACTION_MEDIA_BAD_REMOVAL.equals(action)) {
+					if ((b != null) && b.isPlaying()) {
+						b.onPause();
+						Log.d("CarState: Media unmounted/ejected, paused playback.");
+					}
+				}
+			}
+		};
+
+		try {
+			IntentFilter filter = new IntentFilter();
+			filter.addAction(Intent.ACTION_SCREEN_OFF);
+			filter.addAction(Intent.ACTION_SCREEN_ON);
+			filter.addAction(Intent.ACTION_POWER_CONNECTED);
+			filter.addAction(Intent.ACTION_POWER_DISCONNECTED);
+			filter.addAction(Intent.ACTION_SHUTDOWN);
+
+			IntentFilter mediaFilter = new IntentFilter();
+			mediaFilter.addAction(Intent.ACTION_MEDIA_MOUNTED);
+			mediaFilter.addAction(Intent.ACTION_MEDIA_UNMOUNTED);
+			mediaFilter.addAction(Intent.ACTION_MEDIA_EJECT);
+			mediaFilter.addAction(Intent.ACTION_MEDIA_BAD_REMOVAL);
+			mediaFilter.addDataScheme("file");
+
+			Context ctx = getContext();
+			ctx.registerReceiver(carStateReceiver, filter);
+			ctx.registerReceiver(carStateReceiver, mediaFilter);
+		} catch (Exception ex) {
+			Log.e(ex, "Failed to register car state receiver");
+		}
+	}
+
+	private void duckVolume(AudioManager am) {
+		if (isDucked || (am == null)) return;
+		try {
+			int curVol = am.getStreamVolume(AudioManager.STREAM_MUSIC);
+			if (curVol > 0) {
+				preDuckVolume = curVol;
+				int duckedVol = Math.max(1, (int) Math.round(curVol * 0.25f));
+				am.setStreamVolume(AudioManager.STREAM_MUSIC, duckedVol, 0);
+				isDucked = true;
+				Log.d("CarAudioFocus: Ducked volume from ", curVol, " to ", duckedVol);
+			}
+		} catch (Exception ex) {
+			Log.e(ex, "Failed to duck volume");
+		}
+	}
+
+	private void restoreVolume(AudioManager am) {
+		if (!isDucked || (am == null)) return;
+		try {
+			if (preDuckVolume > 0) {
+				am.setStreamVolume(AudioManager.STREAM_MUSIC, preDuckVolume, 0);
+				Log.d("CarAudioFocus: Restored volume to ", preDuckVolume);
+			}
+		} catch (Exception ex) {
+			Log.e(ex, "Failed to restore volume");
+		} finally {
+			isDucked = false;
+			preDuckVolume = -1;
+		}
+	}
+
+	private void initCarAudioFocus() {
+		if (carAudioFocusListener != null) return;
+		carAudioFocusListener = focusChange -> {
+			if (!getPrefs().getBooleanPref(MainActivityPrefs.CAR_AUDIO_FOCUS_MANAGE)) return;
+			FermataServiceUiBinder b = getMediaServiceBinder();
+			AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+
+			switch (focusChange) {
+				case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+				case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+					if ((b != null) && b.isPlaying()) {
+						if ((am != null) && ((am.getMode() == AudioManager.MODE_IN_CALL)
+								|| (am.getMode() == AudioManager.MODE_IN_COMMUNICATION))) {
+							pausedByTransientFocus = true;
+							b.onPause();
+							Log.d("CarAudioFocus: In phone call, pausing playback.");
+						} else {
+							// Reverse camera / park sensors / navigation guidance: duck volume smoothly
+							duckVolume(am);
+						}
+					}
+					break;
+
+				case AudioManager.AUDIOFOCUS_GAIN:
+					restoreVolume(am);
+					if (pausedByTransientFocus) {
+						pausedByTransientFocus = false;
+						if ((b != null) && !b.isPlaying()) {
+							b.onPlay();
+							Log.d("CarAudioFocus: Focus gained, auto-resuming playback.");
+						}
+					}
+					break;
+
+				case AudioManager.AUDIOFOCUS_LOSS:
+					restoreVolume(am);
+					pausedByTransientFocus = false;
+					break;
+			}
+		};
+
+		try {
+			AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+			if (am != null) {
+				am.requestAudioFocus(carAudioFocusListener, AudioManager.STREAM_MUSIC,
+						AudioManager.AUDIOFOCUS_GAIN);
+			}
+		} catch (Exception ex) {
+			Log.e(ex, "Failed to register car audio focus listener");
+		}
 	}
 
 	// Starting the app from the background needs the "Display over other apps" permission.
@@ -491,6 +663,20 @@ public class MainActivityDelegate extends ActivityDelegate
 		handler.close();
 		getMediaServiceBinder().getMediaSessionCallback().removeAssistant(this);
 		getPrefs().removeBroadcastListener(this);
+		if (carStateReceiver != null) {
+			try {
+				getContext().unregisterReceiver(carStateReceiver);
+			} catch (Exception ignored) {}
+			carStateReceiver = null;
+		}
+		if (carAudioFocusListener != null) {
+			try {
+				AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+				restoreVolume(am);
+				if (am != null) am.abandonAudioFocus(carAudioFocusListener);
+			} catch (Exception ignored) {}
+			carAudioFocusListener = null;
+		}
 		if (speechListener != null) speechListener.destroy();
 
 		for (FermataAddon addon : AddonManager.get().getAddons()) {
