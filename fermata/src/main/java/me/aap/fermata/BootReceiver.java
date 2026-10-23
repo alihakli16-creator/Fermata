@@ -14,13 +14,16 @@ import me.aap.fermata.ui.activity.MainActivityPrefs;
 import me.aap.utils.log.Log;
 
 /**
- * Starts Fermata and resumes the last played video when the device boots.
- * The launch is repeated a few times (about 8, 20 and 40 seconds after boot), because on some
- * head units the system launcher comes to the front after the boot broadcast and hides the app.
+ * Starts Fermata and resumes the last played video after the device boots.
+ * The first launch waits about 25 seconds, so that the other apps that start with the car are up
+ * first and do not take the screen or the audio from Fermata. The launch is repeated once about
+ * 20 seconds later, because on some head units the system launcher comes to the front after the
+ * boot broadcast and hides the app. Change the numbers below to wait longer or shorter.
  */
 public class BootReceiver extends BroadcastReceiver {
 	private static final String ACTION_RETRY = "me.aap.fermata.action.AUTOSTART_RETRY";
-	private static final long[] RETRY_DELAYS = {8000, 12000, 20000}; // delay from the previous launch
+	// Milliseconds: wait after boot before the first launch, then before the second launch
+	private static final long[] RETRY_DELAYS = {25000, 20000};
 
 	@Override
 	public void onReceive(Context ctx, Intent intent) {
@@ -32,8 +35,7 @@ public class BootReceiver extends BroadcastReceiver {
 				|| "android.intent.action.QUICKBOOT_POWERON".equals(action)
 				|| "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
 			if (!isEnabled()) return;
-			launch(ctx);
-			scheduleRetry(ctx, 0);
+			scheduleRetry(ctx, 0); // the first launch happens after the initial delay
 		} else if (ACTION_RETRY.equals(action)) {
 			int n = intent.getIntExtra("n", 0);
 			if (!isEnabled()) return;
