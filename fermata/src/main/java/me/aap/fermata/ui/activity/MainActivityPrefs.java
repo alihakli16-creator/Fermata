@@ -54,8 +54,6 @@ public interface MainActivityPrefs
 	Pref<Supplier<String>> SHOW_ADDON_ON_START = Pref.s("SHOW_ADDON_ON_START", (String) null);
 	Pref<BooleanSupplier> CHECK_UPDATES = Pref.b("CHECK_UPDATES", true);
 	Pref<BooleanSupplier> AUTOSTART = Pref.b("AUTOSTART", true);
-	/** Delay in seconds before launching after vehicle boot (0 to 150 seconds). */
-	Pref<IntSupplier> AUTOSTART_DELAY = Pref.i("AUTOSTART_DELAY", 30);
 	/** Automatically resume the last played media item when Fermata starts. */
 	Pref<BooleanSupplier> AUTOPLAY_LAST_ON_START = Pref.b("AUTOPLAY_LAST_ON_START", true);
 	/** Start the remembered item from the beginning (00:00) to eliminate hardware decoder seek stutter. */

@@ -1,45 +1,35 @@
-# Fermata Auto - Araç İçi Entegrasyon İyileştirmeleri (v7.4)
+# Fermata Auto - BYD & Araç İçi Özel Sürüm (v8 - Nihai Düzeltmeler)
 
-Bu paket, Fermata Auto uygulamasının araç içi multimedya (özellikle **BYD Seal U DM-i** DiLink ve Android Automotive/head unit) sistemlerinde fabrika çıkışı bir medya oynatıcı gibi çalışması için geliştirilen yeni özellikleri içerir.
-
----
-
-## Eklenen Özellikler
-
-### 1. Ayarlanabilir Açılış Gecikmesi (0 - 150 Saniye)
-* **Nasıl Çalışır:** Araç ilk çalıştığında (soğuk açılış veya hızlı başlatma) multimedya işlemcisi yoğun bir şekilde arka plan servislerini ayağa kaldırır. Uygulamanın erken açılıp kilitlenmesini veya araç sistemleriyle çakışmasını önlemek için Ayarlar menüsüne 0 ile 150 saniye arasında gecikme seçeneği (`AUTOSTART_DELAY`) eklendi.
-* **Sonuç:** Sürücü aracına göre ideal süreyi (örneğin 30-40 sn) belirleyebilir. İlk açılışta takılı olan MicroSD/USB bu süreyi ezmez; sistem tamamen hazır olunca oynatıcı devreye girer.
-
-### 2. Hem USB Hem MicroSD Kart Eşzamanlı Kullanım ve Otomatik Başlatma
-* **Nasıl Çalışır:** Fermata Auto dosya kütüphanesine hem USB belleğin (`/storage/XXXX-XXXX` vb.) hem de MicroSD kartın (`/storage/sdcard1` vb.) klasörleri eklenebilir. Android çekirdeği hem USB hem MicroSD mount işlemlerinde `Intent.ACTION_MEDIA_MOUNTED` sinyali fırlatır.
-* **Sonuç:** Hangi ortamdan video/müzik dinliyorsanız sistem o ortamı tanır ve başlatır. Ayrıca ortam araç çalışırken çıkarılırsa (`ACTION_MEDIA_UNMOUNTED` / `ACTION_MEDIA_EJECT`) oynatıcı çökmeden kendini duraklatır.
-
-### 3. Hatırlanan İçeriği Baştan Başlatma ve Donma Koruması (Anti-Stutter & Clean Start)
-* **Nasıl Çalışır:** Araç açıldığında videonun ortasındaki bir saniyeye seek yaparken USB/MicroSD okuma gecikmesi ve dekoderin ana kare (I-frame) araması nedeniyle oluşan 3-5 saniyelik görüntü donması engellendi. Uygulama en son hangi videoda/şarkıda kaldığını hatırlar, ancak oynatmaya doğrudan **00:00** başından başlar.
-* **Sonuç:** Takılma ve gecikme olmadan anında ve pürüzsüz başlangıç.
-
-### 4. Akıllı Ses Kısma ve Geri Vites Yönetimi (Audio Ducking)
-* **Nasıl Çalışır:** `AudioManager.OnAudioFocusChangeListener` entegrasyonuyla geçici ses kesintileri (`AUDIOFOCUS_LOSS_TRANSIENT` ve `AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK`) dinlenir.
-* **Sonuç:** 
-  * Geri vitese takıldığında (360° park kamerası ve sensörler açıldığında) video duraklatılmaz, ses seviyesi otomatik olarak %25'e kısılır (audio ducking). Manevra bitip D/P konumuna geçince ses anında eski seviyesine döner.
-  * Navigasyon (Yandex/Google Haritalar) sesli yönlendirme yaptığında aynı şekilde ses kısılır, anons bittiğinde hemen geri yükselir.
-  * Telefon görüşmelerinde ise mikrofona müzik sesi gitmemesi için video duraklatılır ve görüşme sonlandığında kaldığı saniyeden devam eder.
-
-### 5. Araç Uyku ve Uyanma Desteği (ACC ON / Standby Resume)
-* **Nasıl Çalışır:** Ekranın uyanmasını (`ACTION_SCREEN_ON`) ve güç beslemesini (`ACTION_POWER_CONNECTED`) dinler.
-* **Sonuç:** Araca binip kontağı açtığınızda uygulama kendiliğinden en son videoyu baştan tertemiz başlatır.
-
-### 6. Kontak/Ekran Kapanınca Otomatik Duraklatma (ACC OFF)
-* **Nasıl Çalışır:** Araç stop ettiğinde, şarj kesildiğinde (`ACTION_POWER_DISCONNECTED`) veya ekran karardığında (`ACTION_SCREEN_OFF`) anlık pozisyon hafızaya alınır ve oynatıcı duraklatılır.
-* **Sonuç:** Araç kilitliyken arka planda video oynamaya devam etmez, akü tükenmez.
+Bu paket, **BYD Seal U DM-i** (ve diğer Android tabanlı araç multimedya sistemlerinde) karşılaşılan siyah ekran, ses duraklaması ve başlangıçta boot etmeme sorunlarını tamamen ortadan kaldırmak için optimize edilmiştir.
 
 ---
 
-## Değiştirilen Dosyalar
+## 🚀 v8 Sürümünde Yapılan Kritik Düzeltmeler
 
-1. `fermata/src/main/AndroidManifest.xml`: `MANAGE_EXTERNAL_STORAGE` ve `WRITE_EXTERNAL_STORAGE` izinleri, `BootReceiver` için `ACTION_MEDIA_MOUNTED` ve `ACTION_MEDIA_UNMOUNTED` intent-filter'ları eklendi.
-2. `fermata/src/main/java/me/aap/fermata/BootReceiver.java`: 0-150 sn ayarlanabilir açılış gecikmesi, USB ve MicroSD mount tespiti mantığı eklendi.
-3. `fermata/src/main/java/me/aap/fermata/ui/activity/MainActivityPrefs.java`: `AUTOSTART_DELAY`, `AUTOPLAY_FROM_BEGINNING`, `AUTO_PAUSE_ON_ACC_OFF`, `AUTORESUME_ON_ACC_ON` ve `CAR_AUDIO_FOCUS_MANAGE` ayar anahtarları eklendi.
-4. `fermata/src/main/java/me/aap/fermata/ui/activity/MainActivityDelegate.java`: 00:00 başlangıç konumu mantığı, USB/MicroSD çıkarılma duraklatması, araç durum dinleyicisi (`carStateReceiver`) ve akıllı ses kısma yöneticisi (`carAudioFocusListener`) entegre edildi.
-5. `fermata/src/main/java/me/aap/fermata/ui/fragment/SettingsFragment.java`: Ayarlar arayüzüne gecikme kaydırıcısı ve yeni özelliklerin açma/kapatma anahtarları eklendi.
-6. `fermata/src/main/res/values/strings.xml` & `values-tr/strings.xml`: Türkçe ve İngilizce arayüz metinleri güncellendi.
+### 1. Siyah Ekran / Sadece Arkada Ses Çalma Sorunu Çözüldü
+* **Önceki Sorun:** Otomatik başlatma yapıldığında video arkada ses olarak çalıyor, ekranda ise görüntü siyah kalıyor veya klasör listesinde bekliyordu (dokunana kadar görüntü gelmiyordu).
+* **v8 Çözümü:** Başlatma anında video oynatıcı yüzeyi (`BodyLayout.Mode.VIDEO` ve `setVideoMode(true, vv)`) gecikmesiz olarak doğrudan tam ekrana geçirilir. Donanım video dekoderi yüzeyi hazır bulduğu için video anında görüntüyle birlikte başlar.
+
+### 2. MicroSD Kart ile Hızlı Başlatma (2 Saniye)
+* **Önceki Sorun:** Sabit 40 saniye veya 0-150 saniye gecikme ayarı sistemi bekletiyor ve Android'in arka plan engelleyicisine takılıyordu.
+* **v8 Çözümü:** Araç açıldığında (`BOOT_COMPLETED`), takılı olan MicroSD kartın hazır olduğu (`Environment.MEDIA_MOUNTED`) saniyede algılanır ve 40 saniye yerine yalnızca **2 saniye** içinde (sistemin oturması için) oynatıcı güvenle açılır. USB takılmışsa veya gecikirse yedek zamanlayıcı çalışmaya devam eder.
+
+### 3. Android 10-14 Arka Planda Başlatma Garantisi (FullScreenIntent)
+* **Önceki Sorun:** Hem Samsung telefonlarda (Android 14) hem de BYD DiLink (Android 10/12) sistemlerinde arka plandan Activity başlatma işletim sistemi tarafından sessizce engelleniyordu (`Background activity start blocked`).
+* **v8 Çözümü:** `BootReceiver`'a yüksek öncelikli `FullScreenIntent` bildirim köprüsü eklendi. Sistem kısıtlaması olsa dahi işletim sistemi Fermata ekranını ön plana getirmek zorunda kalır.
+
+### 4. BYD Karşılama Sesi ve Sensör Çakışması Giderildi (Akıllı Odak Yönetimi)
+* **Önceki Sorun:** Araç açılırken çalan karşılama melodisi veya park sensörü sesi Fermata'ya `AUDIOFOCUS_LOSS` gönderiyor, bu da müziğin durmasına ve ekrandan elle Play'e basma zorunluluğuna neden oluyordu. Ayrıca önceki sürümdeki ses kısma kodu sistem sesini bozuyordu.
+* **v8 Çözümü:** 
+  * Android sistem sesine (`setStreamVolume`) asla dokunulmaz, araç fabrika sesi korunur.
+  * Karşılama melodisi gibi ilk açılış sesleri bittiğinde (3.5 saniyelik akıllı kontrol) müzik otomatik olarak çalmaya devam eder.
+  * Geri vitese (360° kamera) geçildiğinde video temiz bir şekilde duraklar, araç tekrar D veya P vitesine alındığında video otomatik devam eder.
+
+---
+
+## 📂 Değiştirilen Dosyalar
+
+1. `fermata/src/main/java/me/aap/fermata/BootReceiver.java`: Hızlı MicroSD algılama + FullScreenIntent arka plan başlatma garantisi.
+2. `fermata/src/main/java/me/aap/fermata/ui/activity/MainActivityDelegate.java`: Otomatik VideoLayout aktivasyonu (siyah ekran sonu) + güvenli ses odağı yönetimi.
+3. `fermata/src/main/AndroidManifest.xml`: `AUTOSTART_LAUNCH` intent-filter kaydı.
+4. `.github/workflows/build-car-apk.yml`: Bulut üzerinde ARM64 APK derleme iş akışı.

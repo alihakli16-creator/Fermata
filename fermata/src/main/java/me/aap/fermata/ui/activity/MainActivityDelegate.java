@@ -342,8 +342,6 @@ public class MainActivityDelegate extends ActivityDelegate
 	private boolean wasPlayingBeforeAccOff;
 	private AudioManager.OnAudioFocusChangeListener carAudioFocusListener;
 	private boolean pausedByTransientFocus;
-	private int preDuckVolume = -1;
-	private boolean isDucked;
 	private boolean autoPlayRunning;
 	private int autoPlayTries;
 
@@ -372,8 +370,22 @@ public class MainActivityDelegate extends ActivityDelegate
 					if (i == null) return;
 					autoPlayTries++;
 					long startPos = getPrefs().getBooleanPref(MainActivityPrefs.AUTOPLAY_FROM_BEGINNING) ? 0 : getLib().getLastPlayedPosition(i);
-					goToCurrent().onCompletion((ok, err) ->
-							b.playItem(i, startPos));
+					goToCurrent().onCompletion((ok, err) -> {
+						b.playItem(i, startPos);
+						requestCarAudioFocus();
+						postDelayed(() -> {
+							try {
+								BodyLayout body = getBody();
+								if (body != null) {
+									VideoView vv = body.getVideoView();
+									body.setMode(BodyLayout.Mode.VIDEO);
+									setVideoMode(true, vv);
+								}
+							} catch (Throwable t) {
+								Log.e(t, "Failed to switch to video mode");
+							}
+						}, 300);
+					});
 				});
 				autoPlayAttempt(attempt + 1);
 			} catch (Exception ex) {
@@ -412,7 +424,18 @@ public class MainActivityDelegate extends ActivityDelegate
 								autoPlayLast();
 							} else if ((b != null) && !b.isPlaying()) {
 								getMediaSessionCallback().onPlay();
+								requestCarAudioFocus();
 								Log.d("CarState: Screen on / power connected, resumed playback.");
+								postDelayed(() -> {
+									try {
+										BodyLayout body = getBody();
+										if (body != null) {
+											VideoView vv = body.getVideoView();
+											body.setMode(BodyLayout.Mode.VIDEO);
+											setVideoMode(true, vv);
+										}
+									} catch (Throwable ignored) {}
+								}, 300);
 							}
 						} else if (getPrefs().getBooleanPref(MainActivityPrefs.AUTOPLAY_LAST_ON_START)) {
 							if ((b != null) && !b.isPlaying()) {
@@ -460,34 +483,28 @@ public class MainActivityDelegate extends ActivityDelegate
 		}
 	}
 
-	private void duckVolume(AudioManager am) {
-		if (isDucked || (am == null)) return;
+	private void requestCarAudioFocus() {
+		if (carAudioFocusListener == null) return;
 		try {
-			int curVol = am.getStreamVolume(AudioManager.STREAM_MUSIC);
-			if (curVol > 0) {
-				preDuckVolume = curVol;
-				int duckedVol = Math.max(1, (int) Math.round(curVol * 0.25f));
-				am.setStreamVolume(AudioManager.STREAM_MUSIC, duckedVol, 0);
-				isDucked = true;
-				Log.d("CarAudioFocus: Ducked volume from ", curVol, " to ", duckedVol);
+			AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+			if (am != null) {
+				am.requestAudioFocus(carAudioFocusListener, AudioManager.STREAM_MUSIC,
+						AudioManager.AUDIOFOCUS_GAIN);
 			}
 		} catch (Exception ex) {
-			Log.e(ex, "Failed to duck volume");
+			Log.e(ex, "Failed to request car audio focus");
 		}
 	}
 
-	private void restoreVolume(AudioManager am) {
-		if (!isDucked || (am == null)) return;
+	private void abandonCarAudioFocus() {
+		if (carAudioFocusListener == null) return;
 		try {
-			if (preDuckVolume > 0) {
-				am.setStreamVolume(AudioManager.STREAM_MUSIC, preDuckVolume, 0);
-				Log.d("CarAudioFocus: Restored volume to ", preDuckVolume);
+			AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+			if (am != null) {
+				am.abandonAudioFocus(carAudioFocusListener);
 			}
 		} catch (Exception ex) {
-			Log.e(ex, "Failed to restore volume");
-		} finally {
-			isDucked = false;
-			preDuckVolume = -1;
+			Log.e(ex, "Failed to abandon car audio focus");
 		}
 	}
 
@@ -496,51 +513,52 @@ public class MainActivityDelegate extends ActivityDelegate
 		carAudioFocusListener = focusChange -> {
 			if (!getPrefs().getBooleanPref(MainActivityPrefs.CAR_AUDIO_FOCUS_MANAGE)) return;
 			FermataServiceUiBinder b = getMediaServiceBinder();
-			AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
 
 			switch (focusChange) {
 				case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
 				case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
 					if ((b != null) && b.isPlaying()) {
-						if ((am != null) && ((am.getMode() == AudioManager.MODE_IN_CALL)
-								|| (am.getMode() == AudioManager.MODE_IN_COMMUNICATION))) {
-							pausedByTransientFocus = true;
-							getMediaSessionCallback().onPause();
-							Log.d("CarAudioFocus: In phone call, pausing playback.");
-						} else {
-							// Reverse camera / park sensors / navigation guidance: duck volume smoothly
-							duckVolume(am);
-						}
+						pausedByTransientFocus = true;
+						getMediaSessionCallback().onPause();
+						Log.d("CarAudioFocus: Transient focus loss (reverse camera/call/navigation), paused playback.");
 					}
 					break;
 
 				case AudioManager.AUDIOFOCUS_GAIN:
-					restoreVolume(am);
 					if (pausedByTransientFocus) {
 						pausedByTransientFocus = false;
 						if ((b != null) && !b.isPlaying()) {
 							getMediaSessionCallback().onPlay();
+							requestCarAudioFocus();
 							Log.d("CarAudioFocus: Focus gained, auto-resuming playback.");
 						}
 					}
 					break;
 
 				case AudioManager.AUDIOFOCUS_LOSS:
-					restoreVolume(am);
-					pausedByTransientFocus = false;
+					// In cars (BYD DiLink), welcome chimes or camera switches can send AUDIOFOCUS_LOSS.
+					// If we were playing or in autostart, pause cleanly and attempt to resume after car chime stops.
+					if ((b != null) && b.isPlaying()) {
+						pausedByTransientFocus = true;
+						getMediaSessionCallback().onPause();
+						Log.d("CarAudioFocus: Focus loss during vehicle chime, temporarily pausing.");
+						postDelayed(() -> {
+							if (pausedByTransientFocus && (b != null) && !b.isPlaying()) {
+								try {
+									AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+									if (am != null && am.getMode() == AudioManager.MODE_NORMAL) {
+										pausedByTransientFocus = false;
+										getMediaSessionCallback().onPlay();
+										requestCarAudioFocus();
+										Log.d("CarAudioFocus: Auto-resumed after vehicle chime.");
+									}
+								} catch (Throwable ignored) {}
+							}
+						}, 3500);
+					}
 					break;
 			}
 		};
-
-		try {
-			AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
-			if (am != null) {
-				am.requestAudioFocus(carAudioFocusListener, AudioManager.STREAM_MUSIC,
-						AudioManager.AUDIOFOCUS_GAIN);
-			}
-		} catch (Exception ex) {
-			Log.e(ex, "Failed to register car audio focus listener");
-		}
 	}
 
 	// Starting the app from the background needs the "Display over other apps" permission.
@@ -670,11 +688,7 @@ public class MainActivityDelegate extends ActivityDelegate
 			carStateReceiver = null;
 		}
 		if (carAudioFocusListener != null) {
-			try {
-				AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
-				restoreVolume(am);
-				if (am != null) am.abandonAudioFocus(carAudioFocusListener);
-			} catch (Exception ignored) {}
+			abandonCarAudioFocus();
 			carAudioFocusListener = null;
 		}
 		if (speechListener != null) speechListener.destroy();

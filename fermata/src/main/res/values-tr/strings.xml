@@ -381,8 +381,6 @@
     <string name="err_failed_to_download">İndirilemiyor: %1$s</string>
     <string name="err_no_audio_record_perm">Ses kayıt izni verilmedi</string>
     <string name="autostart_on_boot">Araç açılınca otomatik başlat</string>
-    <string name="autostart_delay">Açılış gecikmesi (0-150 sn)</string>
-    <string name="autostart_delay_sub">Araç açıldıktan sonra uygulamanın başlaması için beklenecek süre. Araç sisteminin oturması için 20-40 sn önerilir.</string>
     <string name="autoplay_last_on_start">Son oynatılan içeriği otomatik sürdür</string>
     <string name="autoplay_last_on_start_sub">Uygulama açıldığında son video veya şarkıyı otomatik oynat</string>
     <string name="autoplay_from_beginning">İçeriği baştan (00:00) başlat</string>
